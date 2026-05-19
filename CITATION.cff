@@ -10,4 +10,4 @@ version: 1.0.0
 date-released: 2026-05-19
 license: MIT
 repository-code: "https://github.com/eoghanjmckenna/ai-edol"
-# doi: add after minting a Zenodo DOI for the release
+doi: 10.5281/zenodo.20280210

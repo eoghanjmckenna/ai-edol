@@ -1,5 +1,7 @@
 # AI-EDOL: Privacy-Preserving Synthetic Building Energy Data
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20280210.svg)](https://doi.org/10.5281/zenodo.20280210)
+
 AI-EDOL generates privacy-preserving synthetic building energy data using a
 generative AI model. A decoder-only GPT model is trained on smart-meter
 electricity and gas consumption data together with contextual building and
