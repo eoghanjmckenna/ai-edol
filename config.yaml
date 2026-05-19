@@ -1,0 +1,250 @@
+# AI-EDOL pipeline configuration
+# =================================
+# A single flat config consumed by run_pipeline.py. Every stage reads its
+# own section. All data paths are relative to the run directory
+# (experiment.output_dir). Edit values here; there is no config inheritance.
+
+experiment:
+  name: "demo"
+  description: "End-to-end demo pipeline on generated dummy data"
+  output_dir: "output"          # all stage outputs are written here
+  stages:
+    - dummy_data                # generate SERL-like dummy data
+    - tokeniser                 # build tokenisers and tokenise data
+    - sharding                  # create train/val/test shards
+    - training                  # train electricity and gas GPT models
+    - inference                 # generate synthetic data
+    - evaluation                # evaluate fidelity of synthetic data
+
+# ---------------------------------------------------------------------------
+# DUMMY DATA
+# ---------------------------------------------------------------------------
+dummy_data:
+  num_households: 80
+  date_range:
+    start: "2023-01-01"
+    end: "2023-12-31"
+  consumption:
+    electricity_base: 1000      # base electricity consumption (Wh)
+    gas_base: 500               # base gas consumption (Wh)
+    noise_factor: 0.1
+  output:
+    folder: "data/dummy_data"
+    module1_format: "pickle"
+    other_format: "csv"
+  columns:
+    electricity: "Clean_elec_net_Wh"
+    gas: "Clean_gas_Wh"
+    timestamp: "timestamp"
+    household_id: "household_id"
+
+# ---------------------------------------------------------------------------
+# TOKENISER
+# ---------------------------------------------------------------------------
+tokeniser:
+  create_tokenisers: true
+  do_tokenise: true
+  load_tokenisers: null
+  binning_strategy: "uniform"   # equal-width bins with percentile clipping
+  bin_clip_lower: 0
+  bin_clip_upper_percentile: 99.5
+  temperature_clip_lower: -10.0
+  temperature_clip_upper: 35.0
+  solar_clip_lower: 0.0
+  solar_clip_upper_percentile: 99.5
+  value_transform: "none"
+  num_bins:
+    electricity: 64
+    gas: 64
+    temperature: 48
+    solar: 20
+  max_households_create: null
+  max_households_tokenise: null
+  seed_create: 42
+  seed_tokenise: 42
+  num_workers_tokenise: null
+  columns:
+    electricity: "Clean_elec_net_Wh"
+    gas: "Clean_gas_Wh"
+  data_folder: "data/dummy_data"
+  output_folder: "data/tokenised_data"
+  save_tokenisers: "tokenisers/tokenisers.pkl"
+  filtering:
+    enabled: true
+    num_workers: null
+    max_missingness_rate: 0.20
+    exclude_pv_households: true
+    save_distribution_report: true
+    distribution_report_path: "tokeniser_distribution_report.json"
+    path_to_participant_summary: "data/dummy_data/serl_participant_summary_data.csv"
+    path_to_list_of_exporter_puprns: "data/dummy_data/Elec_2023_list_of_exporter_puprns.csv"
+
+# ---------------------------------------------------------------------------
+# SHARDING
+# ---------------------------------------------------------------------------
+sharding:
+  random_seed: 42
+  data_filtering:
+    conditioning_variables: ["region", "has_pv", "building_type", "age_built", "num_rooms", "num_occs"]
+    num_workers: null
+    require_gas_and_electricity: true
+    max_missingness_rate: 0.20
+    exclude_pv_households: true
+    require_all_conditioning_vars: true
+    # k-anonymity filter: drop conditioning-variable combinations with fewer
+    # than k households. Set to 1 for this small dummy-data demo; raise it
+    # (e.g. 3) for a privacy-preserving run on a larger dataset.
+    k_anonymity: 1
+    # The public pipeline only supports unmasked (simplified-conditioning)
+    # generation — keep this false. The masked k-anonymity code path still
+    # exists in sharding.py/generator.py but is not exercised by run_pipeline.py.
+    use_masked_tokens: false
+  num_shards: 2
+  households_per_shard: 10
+  sampling_strategy: "without_replacement"
+  val_households: 8
+  test_households: 8
+  save_shard_metadata: true
+  generate_statistics: true
+  k_anonymity:
+    min_group_size: 3
+    augmentation_factor: 1
+    max_var_count_constrained: 5
+    create_constrained_shards: false
+  k10_aggregation:
+    enabled: true
+    k_value: 3
+    max_synthetic_households: 20
+    random_seed: 42
+    aggregation_method: 'mean'
+    path_to_data_to_aggregate: "data/dummy_data/"
+    output_dir: "data/k_aggregated/"
+  shard_output_dir: "data/shards/"
+
+# ---------------------------------------------------------------------------
+# TRAINING
+# ---------------------------------------------------------------------------
+training:
+  training_type: "single_run"
+  device: "auto"                # "auto" | "cpu" | "cuda" | "mps"
+  model:
+    context_length: 336         # half-hour steps per sequence (336 = 1 week)
+    electricity:
+      n_embd: 32
+      n_head: 4
+      n_layer_do: 1
+      dropout: 0.1
+    gas:
+      n_embd: 32
+      n_head: 4
+      n_layer_do: 1
+      dropout: 0.1
+  optimizer:
+    learning_rate: 0.001
+  epochs: 3
+  batch_size: 16
+  patience: 20
+  eval_iters: 50
+  random_seed: 52
+  # Contextual variables merged into the household metadata catalog during sharding.
+  serl_survey_context: ["B5", "B5_err", "C1_new", "A301", "A302", "A303", "A304",
+    "A305", "A306", "A307", "A308", "A309", "A310", "A3_Other", "A3_sum", "A3_err",
+    "A301_edit", "B1", "B4", "B9", "C5", "D4"]
+  epc_context: ["currentEnergyRating", "totalFloorArea"]
+  participant_summary_context: ["Region", "IMD_quintile"]
+  followup_survey_context: ["A1_corr_C", "A1_err", "B3_1_yes", "B3_4_yes", "C1", "D4", "D5"]
+  num_bins: 10
+  data:
+    missing_data_threshold: 0.2
+    save_data_files: false
+    path_to_module_1_data: "data/tokenised_data"
+    tokeniser_file: "tokenisers/tokenisers.pkl"
+    path_to_shard_data: "data/shards"
+    path_to_serl_survey_data: "data/dummy_data/serl_survey_data.csv"
+    path_to_epc_data: "data/dummy_data/epc_data.csv"
+    path_to_participant_summary_data: "data/dummy_data/serl_participant_summary_data.csv"
+    path_to_followup_survey_data: "data/dummy_data/serl_follow_up_survey_2023_data.csv"
+    path_to_list_of_exporter_puprns: "data/dummy_data/Elec_2023_list_of_exporter_puprns.csv"
+
+# ---------------------------------------------------------------------------
+# INFERENCE
+# ---------------------------------------------------------------------------
+inference:
+  random_seed: 32
+  best_model_to_use_for_eval: "val"
+  # Keep false: the public pipeline only supports unmasked generation
+  # (must match sharding.data_filtering.use_masked_tokens).
+  use_masked_tokens: false
+  block_missing_tokens: true
+  temperature: 1.0
+  save_generated_data: true
+  generated_data_path: "generated_data"
+  num_households_generate: 20
+  batch_size: 10
+  num_samples: 4
+  sampling_strategy: "without_replacement"
+  conditioning_pool: "train_test"
+  device: "auto"
+  path_to_trained_models: "."         # models are saved in the run directory
+  path_to_tokeniser_file: "tokenisers/tokenisers.pkl"
+  path_to_shard_data: "data/shards"
+  data:
+    path_to_module_1_data: "data/tokenised_data"
+
+# ---------------------------------------------------------------------------
+# EVALUATION
+# ---------------------------------------------------------------------------
+evaluation:
+  random_seed: 42
+  sampling:
+    train_households: null
+    val_households: null
+    test_households: null
+    synth_batches: null
+  n_workers: null
+  acf_lags: [1, 2, 48, 96, 336]
+  conditioning_vars: [building_type, num_rooms, region, age_built, num_occs]
+  real_data_batch_size: 10
+  summary_statistics:
+    quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+    rolling_window_days: 1
+    min_valid_pct: 10.0
+    time_bins:
+      night: [0, 6]
+      morning: [6, 12]
+      afternoon: [12, 18]
+      evening: [18, 24]
+  distance_analysis:
+    metric: euclidean
+    normalize_features: true
+    outlier_threshold_percentile: 95
+    nearest_neighbors_k: 5
+    within_group_max_households: 500
+    cross_group_chunk_size: 1000
+  privacy_prefilter:
+    enabled: false
+    exclusion_csv: null
+  save_results_json: true
+  run_visualizations: true
+  run_diagnostics: false
+  diagnostics_integration:
+    enabled: true
+    seasonal_analysis:
+      enabled: true
+    daily_patterns:
+      enabled: true
+      num_degradation_weeks: 8
+      context_length: 336
+    household_month_fidelity:
+      enabled: true
+      quintiles: [20, 40, 60, 80]
+    weekly_fidelity:
+      enabled: true
+      num_weeks: 4
+    token_analysis:
+      enabled: true
+  generated_data_folder: "generated_data"
+  original_data_folder: "data/tokenised_data"
+  shard_metadata_path: "data/shards/shard_metadata.json"
+  metadata_catalog_path: null
+  tokeniser_file: "tokenisers/tokenisers.pkl"

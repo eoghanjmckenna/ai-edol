@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Pipeline run outputs
+output/
+*.pth
+*.pt
+
+# Data files
+*.csv
+*.pkl
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# OS / IDE
+.DS_Store
+._*
+.vscode/
+.idea/
+*.swp

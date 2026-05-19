@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "AI-EDOL: Privacy-Preserving Synthetic Building Energy Data"
+authors:
+  - family-names: McKenna
+    given-names: Eoghan
+    affiliation: University College London
+    orcid: "https://orcid.org/0000-0002-7890-8938"
+version: 1.0.0
+date-released: 2026-05-19
+license: MIT
+repository-code: "https://github.com/eoghanjmckenna/ai-edol"
+# doi: add after minting a Zenodo DOI for the release
