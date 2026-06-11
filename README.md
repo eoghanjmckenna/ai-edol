@@ -13,9 +13,7 @@ model, the data pipeline, and the evaluation framework, and runs end to end on
 generated **dummy data** so anyone can reproduce the workflow without access to
 the original sensitive dataset.
 
-The "EDOL" in the project name refers to UCL's Energy Demand Observatory and
-Laboratory (EDOL) Programme Grant, which maintains the building energy data
-resource this work is built around.
+The "EDOL" in the project name refers to UCL and Oxford University's Energy Demand Observatory and Laboratory (EDOL) Programme Grant, which maintains the building energy data resource this work is built around.
 
 ## What the pipeline does
 
